@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>方塊記錄器</title>
   <style>
-    body { font-family: sans-serif; padding: 20px; margin: 0; }
+    body { font-family: sans-serif; padding: 20px; margin: 0; position: relative; }
     .grid {
       display: grid;
       grid-template-columns: repeat(auto-fit, minmax(60px, 1fr));
@@ -48,65 +48,102 @@
       padding: 10px 20px;
       font-size: 16px;
     }
+    #watermark {
+      position: fixed;
+      bottom: 10px;
+      right: 10px;
+      font-size: 12px;
+      color: rgba(0, 0, 0, 0.3);
+      pointer-events: none;
+    }
   </style>
 </head>
 <body>
   <div class="grid" id="grid"></div>
   <button onclick="clearGrid()">清除</button>
+  <button onclick="downloadSnapshot()">匯出HTML快照</button>
+  <button onclick="exportToPDF()">匯出PDF</button>
 
   <h3>點擊紀錄</h3>
   <div id="log"></div>
   <button onclick="downloadCSV()">匯出CSV</button>
 
+  <div id="watermark"></div>
+
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
   <script>
     const grid = document.getElementById('grid');
     const logDiv = document.getElementById('log');
+    const watermark = document.getElementById('watermark');
     let logData = [];
 
-    for (let i = 1; i <= 29; i++) {
-      const div = document.createElement('div');
-      div.className = 'square';
-      div.dataset.id = i;
-      const img = document.createElement('img');
-      img.src = `img/${i}.png`;
-      img.alt = i;
-      div.appendChild(img);
+    const squareStates = Array(29).fill().map((_, i) => ({ id: i + 1, active: false, isImg: true }));
 
-      div.addEventListener('click', function() {
-        if (div.querySelector('img')) {
-          div.removeChild(div.querySelector('img'));
-          div.textContent = i;
-        } else {
-          div.textContent = '';
-          const newImg = document.createElement('img');
-          newImg.src = `img/${i}.png`;
-          newImg.alt = i;
-          div.appendChild(newImg);
-        }
-
-        div.classList.toggle('active');
-        const now = new Date();
-        const time = now.toTimeString().split(' ')[0];
-        const state = div.classList.contains('active') ? 1 : 0;
-        logData.push(`${time},#${div.dataset.id},${state}`);
-        logDiv.textContent += `${time},#${div.dataset.id},${state}\n`;
-      });
-
-      grid.appendChild(div);
+    function updateWatermark() {
+      const now = new Date();
+      const timeStr = now.toLocaleString();
+      watermark.textContent = `匯出時間：${timeStr}`;
     }
 
-    function clearGrid() {
-      document.querySelectorAll('.square').forEach(sq => {
-        sq.classList.remove('active');
-        if (!sq.querySelector('img')) {
-          const id = sq.dataset.id;
-          sq.textContent = '';
+    function createSquare(state) {
+      const div = document.createElement('div');
+      div.className = 'square';
+      div.dataset.id = state.id;
+
+      if (state.isImg) {
+        const img = document.createElement('img');
+        img.src = `img/${state.id}.png`;
+        img.alt = state.id;
+        div.appendChild(img);
+      } else {
+        div.textContent = state.id;
+      }
+
+      if (state.active) div.classList.add('active');
+
+      div.addEventListener('click', function () {
+        const idx = parseInt(div.dataset.id) - 1;
+        const st = squareStates[idx];
+        st.active = !st.active;
+        st.isImg = !st.isImg;
+
+        div.classList.toggle('active');
+        div.innerHTML = '';
+
+        if (st.isImg) {
           const img = document.createElement('img');
-          img.src = `img/${id}.png`;
-          img.alt = id;
-          sq.appendChild(img);
+          img.src = `img/${st.id}.png`;
+          img.alt = st.id;
+          div.appendChild(img);
+        } else {
+          div.textContent = st.id;
         }
+
+        const now = new Date();
+        const time = now.toTimeString().split(' ')[0];
+        const stateNum = st.active ? 1 : 0;
+        logData.push(`${time},#${st.id},${stateNum}`);
+        logDiv.textContent += `${time},#${st.id},${stateNum}\n`;
       });
+      return div;
+    }
+
+    function initGrid() {
+      grid.innerHTML = '';
+      squareStates.forEach(state => {
+        grid.appendChild(createSquare(state));
+      });
+    }
+
+    initGrid();
+
+    function clearGrid() {
+      squareStates.forEach(st => {
+        st.active = false;
+        st.isImg = true;
+      });
+      initGrid();
     }
 
     function downloadCSV() {
@@ -118,6 +155,54 @@
       a.download = `${today}.csv`;
       a.click();
       URL.revokeObjectURL(url);
+    }
+
+    function downloadSnapshot() {
+      const today = new Date().toISOString().split('T')[0];
+      const htmlContent = `<!DOCTYPE html>
+<html lang="zh-Hant">
+<head><meta charset="UTF-8"><title>快照</title>
+<style>
+body { font-family: sans-serif; padding: 20px; }
+.grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(60px, 1fr)); gap: 10px; }
+.square { width: 100%; aspect-ratio: 1; display: flex; justify-content: center; align-items: center; font-size: 16px; border-radius: 4px; overflow: hidden; }
+.square.active { background-color: green; color: white; }
+.square img { width: 100%; height: 100%; object-fit: cover; }
+</style>
+</head>
+<body>
+<h3>HTML 快照</h3>
+<div class="grid">
+${squareStates.map(st => {
+  const cls = st.active ? 'square active' : 'square';
+  return `<div class="${cls}">` + (st.isImg ? `<img src="img/${st.id}.png" alt="${st.id}">` : `${st.id}`) + `</div>`;
+}).join('\n')}
+</div>
+</body>
+</html>`;
+
+      const blob = new Blob([htmlContent], { type: 'text/html' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `${today}-snapshot.html`;
+      a.click();
+      URL.revokeObjectURL(url);
+    }
+
+    async function exportToPDF() {
+      updateWatermark();
+      await new Promise(resolve => setTimeout(resolve, 100)); // 等待 watermark 顯示
+      const canvas = await html2canvas(document.body);
+      const imgData = canvas.toDataURL('image/png');
+      const { jsPDF } = window.jspdf;
+      const pdf = new jsPDF();
+      const imgProps = pdf.getImageProperties(imgData);
+      const pdfWidth = pdf.internal.pageSize.getWidth();
+      const pdfHeight = (imgProps.height * pdfWidth) / imgProps.width;
+      pdf.addImage(imgData, 'PNG', 0, 0, pdfWidth, pdfHeight);
+      const now = new Date().toISOString().split('T')[0];
+      pdf.save(`${now}.pdf`);
     }
   </script>
 </body>
