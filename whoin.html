@@ -6,9 +6,20 @@
   <title>圖片方塊記錄器</title>
   <style>
     body { font-family: sans-serif; padding: 20px; margin: 0; }
+    header {
+      height: 100px;
+      background: #eee;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      margin-bottom: 20px;
+    }
+    header img {
+      max-height: 100%;
+    }
     .grid {
       display: grid;
-      grid-template-columns: repeat(auto-fit, minmax(60px, 1fr));
+      grid-template-columns: repeat(5, 1fr);
       gap: 10px;
       margin-bottom: 20px;
     }
@@ -26,6 +37,9 @@
       object-fit: cover;
       display: block;
       transition: filter 0.3s;
+    }
+    .square.active img {
+      filter: brightness(50%);
     }
     .square .overlay {
       position: absolute;
@@ -52,9 +66,12 @@
       padding: 10px;
       background: #f9f9f9;
     }
-    button {
+    .buttons {
       margin-top: 10px;
-      margin-right: 10px;
+      display: flex;
+      gap: 10px;
+    }
+    button {
       padding: 10px 20px;
       font-size: 16px;
     }
@@ -68,20 +85,29 @@
       font-size: 14px;
       color: rgba(255, 255, 255, 0.8);
     }
+    .no-export {
+      display: inline-block;
+    }
   </style>
 </head>
 <body>
+  <header>
+    <img src="img/banner.png" alt="橫幅">
+  </header>
+
   <div id="screenshotContainer">
     <div class="grid" id="grid"></div>
     <div id="watermark"></div>
   </div>
 
-  <button onclick="clearGrid()">清除</button>
-  <button onclick="downloadPNG()">匯出圖片</button>
+  <div class="buttons no-export" id="buttons">
+    <button onclick="clearGrid()">清除</button>
+    <button onclick="downloadPNG()">匯出圖片</button>
+    <button onclick="downloadCSV()">匯出CSV</button>
+  </div>
 
   <h3>點擊紀錄</h3>
   <div id="log"></div>
-  <button onclick="downloadCSV()">匯出CSV</button>
 
   <script src="https://cdn.jsdelivr.net/npm/html2canvas@1.4.1/dist/html2canvas.min.js"></script>
   <script>
@@ -138,11 +164,16 @@
       const timestamp = now.toISOString().replace(/T/, ' ').substring(0, 19);
       watermark.textContent = timestamp;
 
+      const buttons = document.querySelectorAll('.no-export');
+      buttons.forEach(el => el.style.display = 'none');
+
       html2canvas(document.querySelector('#screenshotContainer')).then(canvas => {
         const link = document.createElement('a');
         link.download = `snapshot_${timestamp.replace(/[: ]/g, '-')}.png`;
         link.href = canvas.toDataURL();
         link.click();
+
+        buttons.forEach(el => el.style.display = '');
       });
     }
   </script>
