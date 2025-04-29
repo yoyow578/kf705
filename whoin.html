@@ -77,14 +77,14 @@
     }
     #screenshotContainer {
       position: relative;
-      padding-bottom: 80px;
+      padding-bottom: 140px;
     }
     #watermark {
       position: absolute;
-      bottom: 10px;
+      bottom: 50px;
       right: 10px;
       font-size: 14px;
-      color: rgba(0, 0, 0, 0.8);
+      color: #555;
       z-index: 10;
     }
     .no-export {
@@ -160,7 +160,15 @@
     }
 
     function clearGrid() {
-      document.querySelectorAll('.square').forEach(sq => sq.classList.remove('active'));
+      document.querySelectorAll('.square').forEach(sq => {
+        sq.classList.remove('active');
+        const id = sq.dataset.id;
+        finalStates[id] = 0;
+        const now = new Date();
+        const time = now.toTimeString().split(' ')[0];
+        logData.push(`${time},#${id},0`);
+        logDiv.textContent += `${time},#${id},0\n`;
+      });
     }
 
     function downloadCSV() {
@@ -178,7 +186,8 @@
       const lines = [];
       for (const [id, state] of Object.entries(finalStates)) {
         if (state === 1) {
-          lines.push(`#${id},1`);
+          const latest = [...logData].reverse().find(line => line.includes(`#${id},1`));
+          if (latest) lines.push(latest);
         }
       }
       return lines.join("\n");
@@ -193,7 +202,9 @@
       const buttons = document.querySelectorAll('.no-export');
       buttons.forEach(el => el.style.display = 'none');
 
-      html2canvas(document.querySelector('#screenshotContainer')).then(canvas => {
+      html2canvas(document.querySelector('#screenshotContainer'), {
+        width: 1024
+      }).then(canvas => {
         const link = document.createElement('a');
         link.download = `snapshot_${timestamp.replace(/[: ]/g, '-')}.png`;
         link.href = canvas.toDataURL();
