@@ -77,18 +77,26 @@
     }
     #screenshotContainer {
       position: relative;
-      padding-bottom: 40px; /* 保留底部空間 */
+      padding-bottom: 80px;
     }
     #watermark {
       position: absolute;
       bottom: 10px;
       right: 10px;
       font-size: 14px;
-      color: rgba(255, 255, 255, 0.8);
+      color: rgba(0, 0, 0, 0.8);
       z-index: 10;
     }
     .no-export {
       display: inline-block;
+    }
+    #csvSummary {
+      margin-top: 10px;
+      font-size: 14px;
+      white-space: pre-wrap;
+      background-color: #f0f0f0;
+      padding: 10px;
+      border-radius: 5px;
     }
   </style>
 </head>
@@ -99,6 +107,7 @@
 
   <div id="screenshotContainer">
     <div class="grid" id="grid"></div>
+    <div id="csvSummary"></div>
     <div id="watermark"></div>
   </div>
 
@@ -116,7 +125,9 @@
     const grid = document.getElementById('grid');
     const logDiv = document.getElementById('log');
     const watermark = document.getElementById('watermark');
+    const summaryDiv = document.getElementById('csvSummary');
     let logData = [];
+    let finalStates = {};
 
     for (let i = 1; i <= 29; i++) {
       const div = document.createElement('div');
@@ -138,9 +149,11 @@
         div.classList.toggle('active');
         const now = new Date();
         const time = now.toTimeString().split(' ')[0];
+        const id = div.dataset.id;
         const state = div.classList.contains('active') ? 1 : 0;
-        logData.push(`${time},#${div.dataset.id},${state}`);
-        logDiv.textContent += `${time},#${div.dataset.id},${state}\n`;
+        logData.push(`${time},#${id},${state}`);
+        finalStates[id] = state;
+        logDiv.textContent += `${time},#${id},${state}\n`;
       });
 
       grid.appendChild(div);
@@ -161,10 +174,21 @@
       URL.revokeObjectURL(url);
     }
 
+    function generateCSVSummary() {
+      const lines = [];
+      for (const [id, state] of Object.entries(finalStates)) {
+        if (state === 1) {
+          lines.push(`#${id},1`);
+        }
+      }
+      return lines.join("\n");
+    }
+
     function downloadPNG() {
       const now = new Date();
       const timestamp = now.toISOString().replace(/T/, ' ').substring(0, 19);
       watermark.textContent = timestamp;
+      summaryDiv.textContent = generateCSVSummary();
 
       const buttons = document.querySelectorAll('.no-export');
       buttons.forEach(el => el.style.display = 'none');
